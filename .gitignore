@@ -49,3 +49,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Large data files
+src/data/train.json
+src/data/test.json
