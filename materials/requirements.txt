@@ -16,4 +16,4 @@ Machine learning projects of this course must use Python and the following libra
 
 Before you can use JupyterLab and Jupyter Notebook, you need to install the libraries yourself on your account using the pip install command. All libraries are installed from the browser console window using the jupyterlab command.
 
-Note that this file is not suitable as pip requirements.txt. 
+Note that this file is not suitable as pip requirements.txt. §
