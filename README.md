@@ -1,215 +1,177 @@
-# Machine learning introduction
+# Apartment Rental Price Prediction
 
-Summary: This project is an introduction to machine learning and especially to primary data analysis with some practical basics.
+Исследование стоимости аренды квартир на данных RentHop. Проект охватывает первичный анализ данных, обработку выбросов, создание признаков и сравнение четырёх подходов к прогнозированию цены.
 
-💡 [Tap here](https://new.oprosso.net/p/4cb31ec3f47a4596bc758ea1861fb624) **to leave your feedback on the project**. It's anonymous and will help our team make your educational experience better. We recommend completing the survey immediately after the project.
+**Главный результат:** дерево решений показало MAE **759,76 USD** на тестовой выборке. Это примерно на **29,9% меньше**, чем у постоянного прогноза по медиане. Эксперимент также показал, как полином степени 10 становится неустойчивым при выходе за диапазон обучающих данных.
 
-## Contents
+[Открыть исследование в Jupyter Notebook](src/ml_introduction.ipynb) · [Источник данных](https://www.kaggle.com/competitions/two-sigma-connect-rental-listing-inquiries/data)
 
-1. [Chapter I. Preamble](#chapter-i-preamble)
-2. [Chapter II. Introduction](#chapter-ii-introduction) \
-    2.1. [Steps to build a model](#steps-to-build-a-model) \
-    2.2. [ML algorithms](#ml-algorithms) \
-        2.2.1. [Supervised learning](#supervised-learning) \
-        2.2.2. [Unsupervised learning](#unsupervised-learning)
-3. [Chapter III. Goal](#chapter-iii-goal) 
-4. [Chapter IV. Instructions](#chapter-iv-instructions)
-5. [Chapter V. Task](#chapter-v-task)
+**Стек:** Python · pandas · NumPy · scikit-learn · Matplotlib · Seaborn
 
+Учебный проект выполнен в рамках вводного курса машинного обучения School 21. Фокус работы: корректное сравнение моделей, воспроизводимость и объяснение результатов.
 
-## Chapter I. Preamble
+## Результаты
 
-"With the ever-increasing amount of data in electronic form, the need for automated methods of data analysis continues to grow. The goal of machine learning is to develop methods that can automatically detect patterns in data, and then use the discovered patterns to predict future data or other outcomes of interest" — we start our course with the definition of machine learning from one of the widely known books — "Machine Learning A Probabilistic Perspective" by Kevin P. Murphy. 
+Все подходы оценены на одинаковых обучающей и тестовой выборках. Обе метрики выражены в USD; меньшее значение соответствует меньшей ошибке.
 
-There are a lot of problems solved by ML methods:
-* The problem of predicting housing prices. We try to define a cost of an object with a set of features such as quality of repair, footage and area.
-* What disease does the patient have if we observe a certain set of symptoms?
-* Will the customer of the bank pay back the loan if his income is X and he has a good credit history?
-* What products are suitable to show to the user on the main page of the online store to speed up his/her successful search?
+| Подход | MAE, train | MAE, test | RMSE, train | RMSE, test |
+|---|---:|---:|---:|---:|
+| **Дерево решений** | **756,04** | **759,76** | **1 077,48** | **1 081,75** |
+| Прогноз по медиане | 1 086,21 | 1 084,59 | 1 644,24 | 1 635,40 |
+| Прогноз по среднему | 1 139,19 | 1 137,83 | 1 597,65 | 1 590,39 |
+| Линейная регрессия + полином степени 10 | 855,15 | 9,20 × 10¹³ | 1 218,49 | 2,49 × 10¹⁶ |
 
-In most cases we can answer all these questions. But it is much better to have a machine that can do this work without bias and many times faster. Data requires automated methods of analysis, which is what machine learning provides. We define machine learning as a set of methods that can automatically discover patterns in data and then use the discovered patterns to predict future data.
+Дерево оказалось лучшим из четырёх исследованных подходов по обеим тестовым метрикам:
 
-In summary, this course will show you what machine learning is. After reading all the materials and doing the labs, you will master all the basic approaches to building models and learning how to predict the future.
+- MAE ниже на **29,9%** относительно медианного прогноза, лучшего постоянного подхода по MAE;
+- RMSE ниже на **32,0%** относительно прогноза по среднему, лучшего постоянного подхода по RMSE;
+- ошибки дерева на train и test близки: на исследованных данных большого разрыва между выборками не наблюдается.
 
-## Chapter II. Introduction
+Среднее и медиана служат базовыми ориентирами. Медиана лучше справилась с абсолютной ошибкой, среднее с квадратичной. Это помогает оценить, какую пользу даёт использование признаков квартиры.
 
-### Steps to build a model
+## Данные и постановка задачи
 
-![day_1_scheme](misc/images/scheme.png)
+Источник данных: объявления об аренде квартир в Нью-Йорке из соревнования [Two Sigma Connect: Rental Listing Inquiries](https://www.kaggle.com/competitions/two-sigma-connect-rental-listing-inquiries/data).
 
-Suppose you are a very smart home seller. You know all about the real estate market (*data* and *features*) and understand how the price depends on various factors (*algorithm*). For example, you know that the more bedrooms an apartment has, the more expensive it is. But how do you get a machine to learn such dependencies? And how to understand who predicts better, the very smart real estate agent or the machine? 
+В исходном соревновании целевой переменной был уровень интереса к объявлению. В этом учебном исследовании задача изменена: предсказывается **`price`, стоимость аренды**. Поэтому работа представляет собой отдельный эксперимент по регрессии цены.
 
-First, you divide the houses into two groups: **train** and **test** data. The first is used to determine the relationship between features and price. The second predicts the price for new houses that are not in the first group. Thus, **building a model** is a sequence of methods you use to prepare and analyze data, find relations, and then predict new prices. 
+| Выборка | Исходное число объявлений | После очистки цены |
+|---|---:|---:|
+| `train.json` | 49 352 | 48 379 |
+| `test.json` | 74 659 | 73 255 |
 
-The first step of capturing patterns from *train* data is called **fitting** or **training** the model. The data used to fit the model is called the **training data**. All the characteristics that you base your decision on are called **features**. For example, the number of bedrooms or bathrooms are features. And the price is the **target**. Your simple algorithm in the above case might be: "If a house has more than 2 bedrooms, then its price is $188000, otherwise its price is $178000".
+Файлы не пересекаются по `listing_id`. В исходных данных train содержит 15 столбцов, test 14. В тестовом файле отсутствует `interest_level`, но есть цена и оба признака, необходимые для регрессии.
 
-The details of how to *fit* the model are complex enough, and we will discuss them later. After fitting the model, you can apply it to new or **test** data to **predict** prices of new homes. This will allow you to understand how well the model performs on unseen data, i.e., evaluate the performance of our model. In most (though not all) applications, the relevant measure of model quality is predictive accuracy. In other words, are the model's predictions close to what actually happens? There will be more theory on metrics later.
+Для обучения по условию проекта используются только:
 
-Therefore, we follow the next steps to build ML model:
-1. Collect training data;
-2. Get features and target;
-3. Train (fit) model;
-4. Get predictions on new features from unseen part of data (test data);
-5. Evaluate the quality of the model.
+| Признак | Описание |
+|---|---|
+| `bathrooms` | Количество ванных комнат |
+| `bedrooms` | Количество спален |
 
-### ML Algorithms
+`interest_level` исследуется на этапе анализа и создания признаков. В обучение моделей он не входит.
 
-Now let's talk about classifying algorithms. 
-But first, let's look at Tom Mitchell's definition of machine learning:
+Для локального анализа использована публичная копия `train.json` из [материалов mlcourse.ai](https://mlcourse.ai/book/topic06/topic6_feature_engineering_feature_selection.html). Файл `test.json` загружен с Kaggle.
 
-*A computer program is said to learn from experience E with respect to some class of tasks T, and a performance measure P, if its performance on tasks in T, as measured by P, improves with experience E.*
+## Ход исследования
 
-This definition is close to the *experience E* of children in school. From time to time, the set of children learns and then repeats a multiplication table (*task T*) and receive marks (*performance measure P*) for their knowledge. The more times children repeat a multiplication table, the better their knowledge becomes and the better grades they get.
+### 1. Первичный анализ и очистка
 
-Thus, there are many types of machine learning, depending on the type of the tasks T we want the system to learn, the type of performance measure P we use to evaluate the system, and the type of training signal or experience E we give it. There is a wide variety of ML methods. Let's give some examples.
+Проверены структура таблицы, типы данных, пропуски и основные статистики. В исходном train цена достигает **4 490 000 USD** при медиане **3 150 USD**, поэтому начальная гистограмма почти не показывает основную часть распределения.
 
-|  | Task T | Performance measure P | Experience E |
-| ----- | ------ | ------ | ----- |
-| 1 | Predict house price | How close to the price we are | Description of every house in a city with fixed characteristics and price |
-| 2 | Predict whether a client returns a loan | Is our prediction correct or not <br/><br/> Or the amount of money bank lost if provided a loan but the client has not return it | Salary of clients and their credit history |
-| 3 | Predict when a patient needs to take medicine | Whether the medicine helps to recover | Current patient medical records. Performance of randomized control trial with this medicine. Plus the medical records of other patients. |
-| 4 | Choose what medicine out of available a patient should take | Whether the medicine helps to recover | Current patient medical records. Performance of randomized control trials with these medicines. Plus the medical records of other patients |
-| 5 | Choose segment of clients for a promo communication | Open rate of communication <br/><br/> Or increase in profit | The information of what items was included in the promo. Clients purchase history. Characteristics of products |
-| 6 | Recognition of defective products on the production line (based on photo scans) | The amount of skipped defects | Photos of defective and non-defective products |
-| 7 | Decide how to place products on a shelf in a store | The amount of products selled <br/><br/> Or  increase in profit | History of how we placed products before. Orders with products’ amounts. |
-| 8 | Search sites for input text query | The ratio of successful searches <br/><br/> The mean rank of successful answer | Search queries of other users. Text description of every site |
-| 9 | Split customers of a store into segments to understand differences of their behavior | How well you can interpret splits | Customers’ characteristics and purchase history |
-| 10 | Detect anomaly in site traffic | The amount of prevented DDoS attacks | Stream of requests to your servers |
+По обучающей выборке рассчитаны 1-й и 99-й процентили цены. Сохранены объявления с ценами **от 1 475 до 13 000 USD включительно**. Те же границы применены к тестовым ценам.
 
-And these examples could easily be extended with many more tasks. Furthermore, we can slightly change the incoming conditions of the task and it may require a completely different solution. 
+После фильтрации удалено 973 обучающих и 1 404 тестовых объявления. Распределение остаётся асимметричным, с длинным правым хвостом.
 
-For example, imagine that in the 5th example we have to do the promotion for absolutely new products of a new brand, which have no purchase history. Usually when a scientific field has a large variety in the tasks it tries to solve, then some classification is used to make it easier to navigate the tasks within it. ML is no exception. The main classification is into **supervised learning** and **unsupervised learning**.
+![Распределение стоимости аренды после очистки, USD](docs/images/price_distribution.png)
 
-#### Supervised Learning 
+Эта фильтрация задаёт область оценки: итоговые метрики относятся к указанному диапазону аренды.
 
-Supervised learning is when you have some input variables (X) and an output variable (y) and you use an algorithm to learn the mapping function from the input to the output. The problem of predicting house prices is an example of supervised learning. 
+### 2. Анализ признаков и взаимосвязей
 
-It is called supervised learning because the process of an algorithm learning from the training dataset can be thought of as a teacher supervising the learning process. We know the correct answers, the algorithm iteratively makes predictions on the training data, and is corrected by the teacher. Learning stops when the algorithm reaches an acceptable level of performance.
+Построены гистограммы количества комнат, boxplot цены, корреляционная матрица и три диаграммы рассеяния. Уровень интереса закодирован по порядку: `low = 0`, `medium = 1`, `high = 2`.
 
-Supervised learning problems can be further divided into regression and classification problems.
+После исключения крайних цен линейная связь признаков с ценой стала заметно сильнее:
 
-**Classification**. In classification problems, the output space is a set of _C_ unordered and mutually exclusive labels known as **classes**, $$Y = {1,2,...,C}$$. The problem of predicting the class label given an input is also called **pattern recognition**. (If there are just two classes, often denoted by $$y\in\{0,1\}$$ or $$y\in\{−1, +1\}$$, it is called _binary classification_.) A classification problem with multiple classes (greater than 2) is called _multiclass._ There are also a variety of multilabel problems.
+| Пара признаков | До очистки | После очистки |
+|---|---:|---:|
+| Цена и ванные комнаты | 0,070 | 0,672 |
+| Цена и спальни | 0,052 | 0,546 |
 
-For example, we use _binary classification_ to answer the question: does the patient have heart disease? _Multiclass classification_ is used in cases where each sample is assigned to one and only one label: a fruit can be either an apple or a pear or a banana, but not both at the same time.
+![Корреляционная матрица признаков и цены после очистки](docs/images/correlation_matrix.png)
 
-**Regression**. Suppose we want to predict a real-valued quantity $$y ∈ R$$ instead of a class label $$y \in\{1,...,C\}$$; this is known as regression. See the house price prediction example above.
+При этом диапазоны цен для квартир с одинаковым числом комнат сильно перекрываются. Одних этих характеристик недостаточно для однозначного определения стоимости.
 
-Think about which cases from the table above could also be formulated as a classification and regression task. Provide an answer in the project notebook.
+### 3. Создание признаков
 
-#### Unsupervised Learning
+В исследовательской части созданы квадраты количества спален, ванных комнат и кода уровня интереса. Во всех трёх случаях абсолютная величина корреляции с ценой немного уменьшилась.
 
-In supervised learning, we assume that each input example _x_ in the training set has an associated set of output targets _y_, and our goal is to learn the input-output mapping.
+Для обучения применён `PolynomialFeatures(degree=10)` к двум исходным признакам. Получено **66 столбцов**, включая константу, степени и произведения признаков. Преобразование настроено через `fit_transform` на train и применено через `transform` к test.
 
-A much more interesting task is to try to "make sense" of the data, as opposed to just learning a mapping. That is, we just get observed **inputs** $$D = \{x_i:i \in \{1, \dots, N\}$$ without any corresponding **outputs** $$y\_i **$$**. This is called unsupervised learning. In other words, unsupervised learning is when you have only input data (X) and no corresponding output variables.
+### 4. Обучение и сравнение
 
-Unsupervised learning problems can be further classified into **clustering**, **association**, and **dimensionality reduction** problems.
+Сравнены четыре подхода:
 
-**Clustering**: A clustering problem is where you want to discover the inherent groupings in the data, such as grouping customers by purchasing behavior. 
+| Подход | Настройка |
+|---|---|
+| `LinearRegression` | Стандартные параметры, полиномиальные признаки степени 10 |
+| `DecisionTreeRegressor` | `random_state=21`, те же полиномиальные признаки |
+| `naive_mean` | Постоянный прогноз по среднему `y_train` |
+| `naive_median` | Постоянный прогноз по медиане `y_train` |
 
-**Association**: An association rule learning problem is where you want to discover rules that describe large portions of your data, such as people who buy A also tend to buy B.
+Для обеих наивных моделей константы вычислены только по обучающим ценам и затем использованы на обеих выборках. Подбор гиперпараметров не проводился; степень полинома и набор моделей заданы учебным проектом.
 
-**Dimensionality reduction (or generalization)**: The goal of dimensionality reduction is to discover some common properties in our dataset while understanding which features are very different. If we have too many features, we can use this information to compress the features into smaller sets without losing the important information in them. This trick is very useful when we need to visualize our dataset that has many features in it.
+## Почему линейная регрессия дала огромную ошибку
 
-Think about which cases from the table above could be formulated as a clustering, association, and dimensionality reduction task. Provide an answer in the project solution. Please note that the boundary between unsupervised learning classes is not so clear in practice, and sometimes all these tasks are combined. So feel free to share your opinion on how you can use these methods.
+В тестовой выборке обнаружены три объявления с **20, 112 и 20 ванными комнатами**. Максимальное значение этого признака в очищенном train равно 10.
 
-Now you know the basics of ML theory. The next step is the practice.
+Для объявления с 112 ванными комнатами и реальной ценой **3 700 USD** линейная модель на полиномиальных признаках предсказала около **6,74 × 10¹⁸ USD**. Почти вся её абсолютная ошибка на test приходится на эти три наблюдения.
 
-## Chapter III. Goal
+Высокие степени признаков приводят к крайне большим значениям при выходе за обучающий диапазон. Полученная модель оказалась неустойчивой к такой экстраполяции. Дерево выдаёт среднюю обучающую цену в соответствующем листе, поэтому его прогнозы остаются в пределах обучающих цен.
 
-The goal of this project is to give you a basic understanding of how to build the simplest models. We will use the most common methods of data analysis and processing, learn some methods of visualization. The result is a simple regression model to predict the price of an apartment rental listing based on listing content such as text description, photos, number of bedrooms, price, etc.
+В основном эксперименте эти записи сохранены. Все четыре подхода сравниваются на одной тестовой выборке, включая необычные объявления.
 
-## Chapter IV. Instructions
+## Ограничения и выводы
 
-How to learn at “School 21”:
+- Используются только два исходных признака. Площадь, местоположение, описание и фотографии в моделях не учитываются.
+- Оценка ограничена ценами 1 475-13 000 USD. Результаты нельзя напрямую переносить на весь исходный диапазон аренды.
+- Наивные прогнозы показывают, что использование характеристик квартиры даёт измеримое улучшение относительно одной фиксированной цены.
+- Усложнение признаков не гарантирует улучшения: полином степени 10 оказался чувствительным к необычным тестовым значениям.
+- Сравнение фиксированного набора моделей проведено на отдельных файлах train/test. Валидационная выборка и кросс-валидация в рамках задания не использовались. Для дальнейшего выбора и настройки моделей потребовалась бы отдельная валидация.
 
-- Here, you’ll find a unique learning experience with a lot of freedom. You’re given a task and left to find your own way to solve it, using whatever resources work best for you — whether that’s the Internet or AI tools like GigaChat. Just be mindful of information quality: verify, think critically, analyze, and compare.
-- Peer-to-peer (P2P) learning is the exchange of knowledge and experience with peers, where everyone acts as both mentor and student. This approach allows you to gain a deeper understanding of the material by learning from one another.
-- Feel free to ask for help: around you are peers who are also navigating this path for the first time. Share your own experience and ideas with others.  Join Rocket.Chat to stay updated with the latest community announcements. 
-- Your learning is meaningless if you just copy someone else’s solutions. When receiving help from others, always make sure you fully understand the “why”, “how”, and “purpose” behind the solution. Don’t be afraid to make mistakes. 
-- Does the task seem impossible? Take a break, get some fresh air and clear your mind — this has helped many people. Maybe after that, the solution will come to you naturally.
-- The learning process is just as important as the result. It’s not just about completing the task — it’s about understanding HOW to solve it. 
+Основной результат проекта: дерево решений лучше справилось с исследованной задачей, а анализ ошибок позволил объяснить провал более сложной полиномиальной модели.
 
-How to work with the project:
+## Воспроизведение
 
-* This project will be judged by humans only. You are free to organize and name your files as you wish. 
-* We recommend that you push your local code to the develop branch.
-* Here and throughout, we use Python 3 as the only correct version of Python, and recommend that you use JupyterNotebook.
-* There are no strict rules for coding in this project. However, you are asked to be clear and structured in the conception of your code.
-* Please respect the code culture: store data in the `data` folder, move imports and functions to the top of the notebook, add plot labels, leave comments, and make your code clear.
+Проверено на **Python 3.14.7**. Версии библиотек, использованные в исследовании, перечислены в [requirements.txt](requirements.txt). В ноутбуке сохранены результаты вычислений и графики; проверено последовательное выполнение 51 Code-ячейки в чистой сессии без ошибок.
 
-## Chapter V. Task
+### Окружение
 
-We will practice using a problem from Kaggle.com. You will predict the price of an apartment rental listing based on the listing content such as text description, photos, number of bedrooms, etc. The data comes from renthop.com, an apartment listing website. 
+Команды для macOS и Linux выполняются из корня репозитория:
 
-Follow the instructions, answer the questions and get your final score!
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
 
-1. Introduction. Write your answers in the *Intro* section of your notebook. 
-   1. To get started, please write 5 examples of the application of ML methods in life. What is the benefit of using machine learning methods in each of your examples? 
-   2. Use the classification of tasks in the introduction to decide which class you can assign to the tasks from the table above and to the 5 examples you provided. 
-   3. Think about what the difference is between multiclass and multilabel.
-   4. Is an example case with house prices from the theory a classification of a regression problem? Is it possible to reduce the regression problem to classification?
-2. Introduction to Data Analysis
-   1. Import the libraries **pandas**, **numpy**, **sklearn**, **lightgbm**, **scipy**, **statsmodels**, **matplotlib**, **seaborn**. Use **pip install** if necessary.
-   2. Load data from [kaggle](https://www.kaggle.com/competitions/two-sigma-connect-rental-listing-inquiries/data) using **pandas**. You only need the table data, which is in **train.json**.
-   3. What is the size (the number of rows and columns) of your data? 
-   4. Print the list of columns. Which column is a target? 
-   5. Make a quick analysis of the data: use the methods **info()**, **describe()**, **corr()**. Explain the results of the outputs. Are there any empty columns? 
-   6. We'll work with only 3 features: 'bathrooms', 'bedrooms', 'interest_level' and with the target column 'price'. Create a dataframe with only these columns.
-3. Statistical Data Analysis
-   1. To get started with statistical data analysis, we recommend that you refresh your basic knowledge of statistics, such as Mean / Median / Mode / Variance / Standard Deviation. Also you are welcome to be free with distributions (Discrete uniform Distribution, Bernoulli Distribution, Binomial Distribution, Poisson Distribution, Normal Distribution, Exponential Distribution). Please make sure that you know the definitions of outliers, percentiles, confidential intervals. The article will be presented later. 
-   2. Have a quick look at [this article](https://towardsdatascience.com/how-to-compare-two-or-more-distributions-9b06ee4d30bf). Please pay attention to such aspects as distributions and histograms, boxplots, outliers, kernel density function.
-   3. Target analysis
-      1. Plot a histogram to understand the distribution of the target. Is it all clear? 
-      2. The next step is boxplot(). What can you say about the target? Are there any outliers? 
-      3. Drop the rows that are outside the 1 and 99 percentiles from the target column. 
-      4. Plot another histogram for price. Explain the result.
-   4. Characteristics Analysis
-      1. What is the type of column 'interest_level'? 
-      2. Print the values in this column. How many entries does each value contain? 
-      3. Encode these values. For example, you can replace each value with 0, 1, or 2.
-      4. Plot histograms for the features 'bathrooms', 'bedrooms'. Are there any outliers?
-   5. Complex analysis
-      1. Plot a correlation matrix to understand the correlation between features and target. Plot a heat map for the correlation matrix. Is there a correlation? 
-      2. Plot a scatterplot to visualize the correlation between the features and the target. You should return 3 plots where the X-axis is the target and the Y-axis is a feature.
-4. Creating Features
-   1. This step is very broad. You can create as many features as you want. For example, you can add 3 new features that are squared: 'bathrooms_squared', 'bedrooms_squared', ''interest_level_squared'. Plot a correlation matrix with the new features. Are the new features more correlated with the target than the basic features? 
-   2. To train the model here, we will not use your new features. Remember this example and use it in Lecture 2. To train the model, we will only consider the features 'bathrooms' and 'bedrooms'.
-   3. Read this [Sklearn info about PolynomialFeatures](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.PolynomialFeatures.html).
-   4. To use PolynomialFeatures, we first need to split the data into training and test samples. We have already done this for you, please read the training and test data. 
-   5. Initialize PolynomialFeatures() with a degree of 10. 
-   6. Apply PolynomialFeatures() to fit and transform your training and test data.
-5. Now you need to train 3 models: linear regression, decision tree and naive model. We will use them as black boxes without deep understanding. 
-   1. Results table 
-      1. Create two empty Pandas DataFrames with columns 'model', 'train', 'test'. Let's call the first one result_MAE and the second one result_RMSE. We will fill these tables with the results of the models.
-   2. Linear Regression 
-      1. Initialize linear regression from **sklearn** with no parameters. 
-      2. Fit your model and make predictions on training and test features. Save it as new columns in data.
-      3. Compute MAE (Mean Absolute Error) on training and test targets.
-      4. Calculate RMSE (Root Mean Square Error) on training and test objectives.
-      5. Insert your metrics into tables *result_MAE* and *result_RMSE* with model name 'linear_regression'.
-   3. Decision Tree
-      1. Initialize decision tree regressor from sklearn with fixed random_state=21.
-      2. Fit it to train features and train target and make prediction on train and test features. Save it as a new column in data. 
-      3. Compute MAE (Mean Absolute Error) on train and test targets.
-      4. Compute RMSE (Root Mean Square Error) on train and test targets.
-      5. Insert your metrics into tables *result_MAE* and *result_RMSE* with model name 'decision_tree'.
-   4. Naive Models
-      1. Calculate the mean and median of 'price' on the training and test data and create a column with these values. 
-      2. Calculate the MAE on the training and test targets between your target and the calculated mean and median. 
-      3. Calculate the RMSE on the training and test targets between your target and the calculated mean and median. 
-      4. Insert your metrics into tables result_MAE and result_RMSE with model names 'naive_mean' and 'naive_median'.
-   5. Compare the results 
-      1. Print your final result_MAE and result_RMSE tables. 
-      2. Which is the best model?
-   6. Additional
-      1. You can practice with all the data in your starting dataset. Use and generate all the features you want.
+Если на macOS импорт LightGBM сообщает об отсутствии `libomp.dylib`, установите системную библиотеку OpenMP:
 
-### Submission
+```bash
+brew install libomp
+```
 
-Save your code in Python JupyterNotebook. Your peer will load it and compare it to the basic solution. Your code should include answers to all mandatory questions. The additional task is up to you. 
+### Подготовка данных
 
+Скачайте `train.json.zip` и `test.json.zip` со [страницы данных Kaggle](https://www.kaggle.com/competitions/two-sigma-connect-rental-listing-inquiries/data), распакуйте и разместите JSON-файлы в `src/data/`. Для запуска нужны только эти два файла.
 
->Please leave feedback on the project in the [feedback form.](https://forms.yandex.ru/cloud/646b43a8eb61462a4d084f0a/) 
+### Запуск ноутбука
 
+В VS Code откройте [src/ml_introduction.ipynb](src/ml_introduction.ipynb), выберите созданное окружение Python и выполните **Run All**. Рабочая папка ядра должна быть `src`, поскольку в ноутбуке используются пути `./data/train.json` и `./data/test.json`.
 
+Также можно запустить JupyterLab:
 
+```bash
+python -m pip install jupyterlab
+cd src
+python -m jupyterlab ml_introduction.ipynb
+```
+
+## Структура проекта
+
+```text
+.
+├── README.md
+├── requirements.txt
+├── docs/
+│   └── images/
+│       ├── price_distribution.png
+│       └── correlation_matrix.png
+└── src/
+    ├── ml_introduction.ipynb
+    └── data/
+        ├── train.json
+        └── test.json
+```
+
+Все этапы анализа, код моделей, расчёт метрик и подробные пояснения собраны в [основном ноутбуке](src/ml_introduction.ipynb).
